@@ -1,0 +1,186 @@
+              	; --------------------------------------
+              	; zasm: assemble "bootloader.asm"
+              	; date: 2018-11-01 23:07:20
+              	; --------------------------------------
+
+
+              	; ***************************************************************************************
+              	; ***************************************************************************************
+              	;
+              	;		Name : 		bootloader.asm
+              	;		Author :	Paul Robson (paul@robsons.org.uk)
+              	;		Date : 		1st November
+              	;		Purpose :	Boot-Loads code by loading "boot.img" into memory
+              	;					from $8000-$BFFF then banks 32-94 (2 per page) into $C000-$FFFF
+              	;
+              	; ***************************************************************************************
+              	; ***************************************************************************************
+              	
+0020:         	FirstPage = 32 												; these are the pages for an 
+005F:         	LastPage = 95 												; unexpanded ZXNext
+              	
+3FE5:         			org 	$4000-27
+3FE5: 3F      			db 		$3F
+3FE6: 00000000			dw 		0,0,0,0,0,0,0,0,0,0,0
+3FEA: 00...   	
+              			org 	$4000-4
+3FFC: FE5A    			dw 		$5AFE
+3FFE: 01      			db 		1
+3FFF: 07      			db 		7
+4000: FFFFFFFF			org 	$5AFE
+4004: FF...   	
+5AFE: 007F    			dw 		$7F00	
+5B00: FFFFFFFF			org 	$7F00 	
+5B04: FF...   	
+              	
+7F00: 31FF7E  	Start:	ld 		sp,Start-1 									; set up the stack.
+7F03: DD216C7F			ld 		ix,ImageName
+7F07: CD137F  			call 	ReadNextMemory
+7F0A: C30080  			jp	 	$8000 										; run.
+              	
+              	; ***************************************************************************************
+              	;
+              	;								 Access the default drive
+              	;
+              	; ***************************************************************************************
+              	
+7F0D:         	FindDefaultDrive:
+7F0D: CF      			rst 	$08 										; set the default drive.
+7F0E: 89      			db 		$89
+7F0F: 32757F  			ld 		(DefaultDrive),a
+7F12: C9      			ret
+              	
+              	; ***************************************************************************************
+              	;
+              	;			Read ZXNext memory from $8000-$BFFF then pages from $C000-$FFFF
+              	;
+              	; ***************************************************************************************
+              	
+7F13:         	ReadNextMemory:
+7F13: CD0D7F  			call 	FindDefaultDrive 							; get default drive
+7F16: CD407F  			call 	OpenFileRead 								; open for reading
+7F19: DD210080			ld 		ix,$8000 									; read in 8000-BFFF
+7F1D: CD537F  			call 	Read16kBlock
+7F20: 0620    			ld 		b,FirstPage 								; current page
+7F22:         	__ReadBlockLoop:
+7F22: CD377F  			call 	SetPaging 									; access the pages
+7F25: DD2100C0			ld 		ix,$C000 									; read in C000-FFFF
+7F29: CD537F  			call 	Read16kBlock 								; read it in
+7F2C: 04      			inc 	b 											; there are two 8k blocks
+7F2D: 04      			inc 	b 											; per page
+7F2E: 78      			ld 		a,b
+7F2F: FE60    			cp 		LastPage+1 									; until read in pages 32-95
+7F31: 20EF    			jr 		nz,__ReadBlockLoop
+7F33: CD647F  			call 	CloseFile 									; close file.
+7F36: C9      			ret
+              	
+              	; ***************************************************************************************
+              	;
+              	;						   Map $C000-$FFFF onto blocks b and b+1
+              	;
+              	; ***************************************************************************************
+              	
+7F37:         	SetPaging:
+7F37: 78      			ld 		a,b 										; set $56
+7F38: ED9256  			db 		$ED,$92,$56
+7F3B: 3C      			inc 	a 											; set $57
+7F3C: ED9257  			db 		$ED,$92,$57
+7F3F: C9      			ret
+              	
+              	
+              	; ***************************************************************************************
+              	;
+              	;									Open file read
+              	;
+              	; ***************************************************************************************
+              	
+7F40:         	OpenFileRead:
+7F40: F5      			push 	af
+7F41: C5      			push 	bc
+7F42: DDE5    			push 	ix
+7F44: 0601    			ld 		b,1
+7F46:         	__OpenFile:
+7F46: 3A757F  			ld 		a,(DefaultDrive)
+7F49: CF      			rst 	$08
+7F4A: 9A      			db 		$9A
+7F4B: 32767F  			ld 		(FileHandle),a 
+7F4E: DDE1    			pop 	ix
+7F50: C1      			pop 	bc
+7F51: F1      			pop 	af
+7F52: C9      			ret
+              	
+              	; ***************************************************************************************
+              	;
+              	;									Read 16k block
+              	;
+              	; ***************************************************************************************
+              	
+7F53:         	Read16kBlock:
+7F53: F5      			push 	af
+7F54: C5      			push 	bc
+7F55: DDE5    			push 	ix
+7F57: 3A767F  			ld 		a,(FileHandle)
+7F5A: 010040  			ld 		bc,$4000
+7F5D: CF      			rst 	$08
+7F5E: 9D      			db 		$9D
+7F5F: DDE1    			pop 	ix
+7F61: C1      			pop 	bc
+7F62: F1      			pop 	af
+7F63: C9      			ret
+              	
+              	; ***************************************************************************************
+              	;
+              	;										Close open file
+              	;
+              	; ***************************************************************************************
+              	
+7F64:         	CloseFile:
+7F64: F5      			push 	af
+7F65: 3A767F  			ld 		a,(FileHandle)
+7F68: CF      			rst 	$08
+7F69: 9B      			db 		$9B
+7F6A: F1      			pop 	af
+7F6B: C9      			ret		
+              	
+7F6C:         	ImageName:
+7F6C: 626F6F74			db 		"boot.img",0
+7F70: 2E696D67	
+7F74: 00      	
+              	
+7F75:         	DefaultDrive:
+7F75: 00      			db 		0
+7F76:         	FileHandle:
+7F76: 00      			db 		0
+              	
+7F77: FFFFFFFF			org 	$FFFF
+7F7B: FF...   	
+FFFF: 00      			db 		0
+              	
+
+
+; +++ segments +++
+
+#CODE          = $3FE5 = 16357,  size = $C01B = 49179
+
+; +++ global symbols +++
+
+CloseFile        = $7F64 = 32612          bootloader.asm:128
+DefaultDrive     = $7F75 = 32629          bootloader.asm:139
+FileHandle       = $7F76 = 32630          bootloader.asm:141
+FindDefaultDrive = $7F0D = 32525          bootloader.asm:38
+FirstPage        = $0020 =    32          bootloader.asm:13
+ImageName        = $7F6C = 32620          bootloader.asm:136
+LastPage         = $005F =    95          bootloader.asm:14
+OpenFileRead     = $7F40 = 32576          bootloader.asm:88
+Read16kBlock     = $7F53 = 32595          bootloader.asm:109
+ReadNextMemory   = $7F13 = 32531          bootloader.asm:50
+SetPaging        = $7F37 = 32567          bootloader.asm:74
+Start            = $7F00 = 32512          bootloader.asm:27
+__OpenFile       = $7F46 = 32582          bootloader.asm:93 (unused)
+__ReadBlockLoop  = $7F22 = 32546          bootloader.asm:56
+_end             = $0000 = 65536          bootloader.asm:15 (unused)
+_size            = $C01B = 49179          bootloader.asm:15 (unused)
+
+
+total time: 0.0007 sec.
+no errors

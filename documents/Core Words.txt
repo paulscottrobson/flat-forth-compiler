@@ -4,9 +4,7 @@ Core Words
 !
 .hex
 @
-*
-/
-/mod
+
 +
 +!
 or
@@ -30,7 +28,6 @@ i
 inkey
 max
 min
-mod
 move
 0-
 xor
