@@ -12,6 +12,6 @@ del /Q bootloader.asm.dat
 rem
 rem	Copy to files area if successful.
 rem
-if exist bootloader.sna	copy bootloader.sna ..\files
+if exist bootloader.sna	copy bootloader.sna ..\files >NUL
 
 
