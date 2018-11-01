@@ -1,0 +1,57 @@
+Core Words
+==========
+-
+!
+.hex
+@
+*
+/
+/mod
++
++!
+or
+< = > <> >= <=
+0<
+0=
+1+ 1- 2+ 2-
+2* 4* 8* 16* 256*
+2/ 4/ 16/ 256/
+a>b b>a b>c c>b a>c c>a
+a>r abc> b>r c>r
+abs
+and
+bswap
+c!
+c@
+debug
+fill
+halt
+i
+inkey
+max
+min
+mod
+move
+0-
+xor
+p!
+p@
+r>a r>abc r>b r>c
+swap
+sys.info
+
+Compiler Words
+==============
+:
+; 
+!
+!! @@
+[-]if .. then
+begin .. [-]until
+begin .. again
+break
+for .. [-]next
+forth
+macro
+private
+variable
