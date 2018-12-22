@@ -38,6 +38,18 @@ class FlatForthImage(object):
 	def getCodeAddress(self):
 		return self.currentAddress
 	#
+	#		Compile Byte/Word
+	#
+	def cByte(self,data):
+		self.write(self.currentPage,self.currentAddress,data)
+		print("${0:02x}:${1:04x} ${2:02x}".format(self.currentPage,self.currentAddress,data))
+		self.currentAddress += 1
+	def cWord(self,data):
+		self.write(self.currentPage,self.currentAddress,data & 0xFF)
+		self.write(self.currentPage,self.currentAddress+1,data >> 8)
+		print("${0:02x}:${1:04x} ${2:04x}".format(self.currentPage,self.currentAddress,data))
+		self.currentAddress += 2
+	#
 	#		Convert a page/z80 address to an address in the image
 	#
 	def address(self,page,address):
@@ -55,7 +67,7 @@ class FlatForthImage(object):
 	#
 	#		Write byte to image
 	#
-	def write(self,page,address,data,dataType = 2):
+	def write(self,page,address,data):
 		self.expandImage(page,address)
 		assert data >= 0 and data < 256
 		self.image[self.address(page,address)] = data
