@@ -19,33 +19,43 @@ Parameter = $8008
 ; ***************************************************************************************
 
 ;; a>r
+core_97_62_114:
 		push 	hl
 ;; b>r
+core_98_62_114:
 		push 	de
 ;; ab>r
+core_97_98_62_114:
 		push 	de
-		push 	hl				
+		push 	hl
 ;; r>a
+core_114_62_97:
 		pop 	hl
 ;; r>b
+core_114_62_98:
 		pop 	de
 ;; r>ab
-		pop 	hl				
+core_114_62_97_98:
+		pop 	hl
 		pop 	de
 
 ; ***************************************************************************************
 ;										Register to Register
 ; ***************************************************************************************
 
-;; a>b 	
+;; a>b
+core_97_62_98:
 		ld 		d,h
 		ld 		e,l
 ;; b>a
+core_98_62_97:
 		ld 		h,d
 		ld 		l,e
 ;; swap
+core_115_119_97_112:
 		ex 		de,hl
 ;; param!
+core_112_97_114_97_109_33:
 		ld 		(Parameter),hl
 
 ; ***************************************************************************************
@@ -53,9 +63,11 @@ Parameter = $8008
 ; ***************************************************************************************
 
 ;; add
+core_97_100_100:
 		add 	hl,de
 
 ;; and
+core_97_110_100:
 		ld 		a,h
 		and 	d
 		ld 		h,a
@@ -63,7 +75,8 @@ Parameter = $8008
 		and 	e
 		ld 		l,a
 
-;; or 
+;; or
+core_111_114:
 		ld 		a,h
 		or 		d
 		ld 		h,a
@@ -72,6 +85,7 @@ Parameter = $8008
 		ld 		l,a
 
 ;; xor
+core_120_111_114:
 		ld 		a,h
 		xor 	d
 		ld 		h,a
@@ -80,6 +94,7 @@ Parameter = $8008
 		ld 		l,a
 
 ;; *+
+core_42_43:
 		srl 	b 									; shift BC into C
 		rr 		c
 		jr 		nc,__SkipMultiply 					; if set, add B to A
@@ -90,6 +105,7 @@ __SkipMultiply:
 		ex 		de,hl
 
 ;; =
+core_61:
 		ld 		a,l 								; L = L ^ E
 		xor 	e
 		ld 		l,a
@@ -97,7 +113,7 @@ __SkipMultiply:
 		xor 	d
 		or 		l
 		jr 		z,__IsEqual
-		ld 		a,$FF 	
+		ld 		a,$FF
 __IsEqual:	 										; 0 if equal, $FF if different
 		cpl 										; $FF if equal 0 if different
 		ld 		h,a 								; put into HL
@@ -105,6 +121,7 @@ __IsEqual:	 										; 0 if equal, $FF if different
 
 
 ;; <
+core_60:
 		ld 		a,h 								; check bit 7 different.
 		xor 	d
 		add 	a,a 								; put into Carry flag
@@ -121,7 +138,7 @@ __less_differentsigns:
 		ld 		a,h 								; if H is +ve, then B must be < A
 		add 	a,a 								; so carry set = true
 		ld 		a,0 								; A = 0 if cc, 255 if cs
-		sbc 	a,a 	
+		sbc 	a,a
 __less_exit:
 		ld 		h,a 								; put result in HL
 		ld 		l,a
@@ -131,25 +148,30 @@ __less_exit:
 ; ***************************************************************************************
 
 ;; !
+core_33:
 		ld 		(hl),e
 		inc 	hl
 		ld 		(hl),d
 		dec 	hl
 
 ;; c!
+core_99_33:
 		ld 		(hl),e
 
-;; @ 	
+;; @
+core_64:
 		ld 		a,(hl)
 		inc 	hl
 		ld 		h,(hl)
 		ld 		l,a
 
-;; c@	
+;; c@
+core_99_64:
 		ld 		l,(hl)
 		ld 		h,0
 
 ;; +!
+core_43_33:
 		ld 		a,(hl)
 		add 	a,e
 		ld 		(hl),a
@@ -159,11 +181,13 @@ __less_exit:
 		ld 		(hl),a
 		dec 	hl
 
-;; p@	
+;; p@
+core_112_64:
 		in 		l,(c)
 		ld 		h,0
 
-;; p! 	
+;; p!
+core_112_33:
 		out 	(c),l
 
 ; ***************************************************************************************
@@ -171,6 +195,7 @@ __less_exit:
 ; ***************************************************************************************
 
 ;; 0=
+core_48_61:
 		ld 		a,h
 		or 		l
 		ld 		hl,$0000
@@ -178,54 +203,66 @@ __less_exit:
 		dec 	hl
 __0Equal:
 
-;; - 	
+;; -
+core_45:
 		ld 		a,h
 		cpl
 		ld 		h,a
 		ld 		a,l
-		cpl 		
+		cpl
 		ld 		l,a
 
 ;; 2*
+core_50_42:
 		add 	hl,hl
 ;; 4*
-		add 	hl,hl		
-		add 	hl,hl		
+core_52_42:
+		add 	hl,hl
+		add 	hl,hl
 ;; 8*
-		add 	hl,hl		
-		add 	hl,hl		
-		add 	hl,hl		
+core_56_42:
+		add 	hl,hl
+		add 	hl,hl
+		add 	hl,hl
 ;; 16*
-		add 	hl,hl		
-		add 	hl,hl		
-		add 	hl,hl		
-		add 	hl,hl		
+core_49_54_42:
+		add 	hl,hl
+		add 	hl,hl
+		add 	hl,hl
+		add 	hl,hl
 
-;; 2/ 	
+;; 2/
+core_50_47:
 		srl 	h
 		rr 		l
 
-;; ++ 		
+;; ++
+core_43_43:
 		inc 	hl
 ;; --
+core_45_45:
 		dec 	hl
-;; +++		
+;; +++
+core_43_43_43:
 		inc 	hl
 		inc 	hl
 ;; ---
+core_45_45_45:
 		dec 	hl
 		dec 	hl
 
 ;; negate
+core_110_101_103_97_116_101:
 		ld 		a,h
 		cpl
 		ld 		h,a
 		ld 		a,l
-		cpl 		
+		cpl
 		ld 		l,a
 		inc 	hl
 
 ;; bswap
+core_98_115_119_97_112:
 		ld 		a,h
 		ld 		h,l
 		ld 		l,a
@@ -235,14 +272,16 @@ __0Equal:
 ; ***************************************************************************************
 
 ;; copy
+core_99_111_112_121:
 		ld 		bc,(Parameter)
 		ldir 										; A = source B = target C = count
 
 ;; fill
+core_102_105_108_108:
 		ld 		bc,(Parameter)
 		ex 		de,hl  								; A = number B = target C = count
 __fill_loop
-		ld 		(hl),e		
+		ld 		(hl),e
 		inc 	hl
 		dec 	bc
 		ld 		a,b
@@ -250,14 +289,17 @@ __fill_loop
 		jr 		nz,__fill_loop
 
 ;; ;
+core_59:
 		ret
 
 ;; halt
+core_104_97_108_116:
 		db 		$DD,$00 							; will cause CSpect to quit if -exit on CLI
-__halt_loop:		
-		di 
-		halt 	
+__halt_loop:
+		di
+		halt
 		jr 		__halt_loop
 
 
 ;; end_marker
+core_101_110_100_95_109_97_114_107_101_114:
