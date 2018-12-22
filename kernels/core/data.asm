@@ -20,13 +20,17 @@ SystemInformation:
 Here:												; +0 	Here 
 		dw 		FreeMemory
 HerePage: 											; +2	Here.Page
-		db 		$20,0
+		db 		FirstCodePage,0
 NextFreePage: 										; +4 	Next available code page (2 8k pages/page)
-		db 		$22,0,0,0
+		db 		FirstCodePage+2,0,0,0
 DisplayInfo: 										; +8 	Display information
 		dw 		DisplayInformation,0		
 Parameter: 											; +12 	Third Parameter used in some functions.
 		dw 		0,0
+StartAddress: 										; +16 	Start Address
+		dw 		__KernelHalt
+StartAddressPage: 									; +20 	Start Page
+		db 		FirstCodePage,0
 
 ; ***************************************************************************************
 ;

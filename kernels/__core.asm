@@ -4,12 +4,14 @@
 ;		Name : 		kernel.asm
 ;		Author :	Paul Robson (paul@robsons.org.uk)
 ;		Date : 		22nd December 2018
-;		Purpose :	Flat Color Forth Kernel
+;		Purpose :	Flat Forth Kernel
 ;
 ; ***************************************************************************************
 ; ***************************************************************************************
 
 StackTop = $7EFC 									;      -$7EFC Top of stack
+DictionaryPage = $20 								; $20 = dictionary page
+FirstCodePage = $22 								; $22 = code page.
 
 		opt 	zxnextreg
 		org 	$8000 								; $8000 boot.
@@ -21,11 +23,25 @@ StackTop = $7EFC 									;      -$7EFC Top of stack
 		org 	$8010 								; $8010 address of words list.
 		dw 	 	WordListAddress,0
 
-
 Boot:	ld 		sp,StackTop							; reset Z80 Stack
 		di											; disable interrupts
-
+		db 		$DD,$01
 		db 		$ED,$91,7,2							; set turbo port (7) to 2 (14Mhz speed)
+
+		ld 		a,(StartAddressPage)				; Switch to start page
+		nextreg	$56,a
+		inc 	a
+		nextreg	$57,a
+		dec 	a
+		ex 		af,af'								; Set A' to current page.
+		ld 		ix,(StartAddress) 					; start running address
+		ld 		hl,$0000 							; clear A + B
+		ld 		de,$0000
+		jp 		(ix) 								; and start
+
+
+__KernelHalt:
+		jr 		__KernelHalt
 
 AlternateFont:										; nicer font
 		include "font.inc" 							; can be $3D00 here to save memory
@@ -151,9 +167,8 @@ __kr_symbol_shift_table:
 ; *********************************************************************************
 ; *********************************************************************************
 ;
-;		File:		screen48k.asm
-;		Purpose:	Hardware interface to Spectrum display, standard but with
-;					sprites enabled.
+;		File:		screen_layer2.asm
+;		Purpose:	Layer 2 console interface, sprites enabled, no shadow.
 ;		Date : 		22nd December 2018
 ;		Author:		paul@robsons.org.uk
 ;
@@ -162,104 +177,155 @@ __kr_symbol_shift_table:
 
 ; *********************************************************************************
 ;
-;						Call the SetMode for the Spectrum 48k
+;								Clear Layer 2 Display.
 ;
 ; *********************************************************************************
+
 
 GFXInitialise:
-		push 	af 									; save registers
+		push 	af
 		push 	bc
-
-		ld 		bc,$123B 							; Layer 2 access port
-		ld 		a,0 								; disable Layer 2
-		out 	(c),a
+		push 	de
 		db 		$ED,$91,$15,$3						; Disable LowRes but enable Sprites
 
-		ld 		hl,$4000 							; clear pixel memory
-__cs1:	ld 		(hl),0
-		inc 	hl
+		ld 		e,2 								; 3 banks to erase
+L2PClear:
+		ld 		a,e 								; put bank number in bits 6/7
+		rrc 	a
+		rrc 	a
+		or 		2+1 								; shadow on, visible, enable write paging
+		ld 		bc,$123B 							; out to layer 2 port
+		out 	(c),a
+		ld 		hl,$4000 							; erase the bank to $00
+		ld 		d,l 								; D = 0, slightly quicker.
+L2PClearBank: 										; assume default palette :)
+		dec 	hl
+		ld 		(hl),d
 		ld 		a,h
-		cp 		$58
-		jr 		nz,__cs1
-__cs2:	ld 		(hl),$47							; clear attribute memory
-		inc 	hl
-		ld 		a,h
-		cp 		$5B
-		jr 		nz,__cs2
-		xor 	a 									; border off
+		or 		l
+		jr		nz,L2PClearBank
+		dec 	e
+		jp 		p,L2PClear
+
+		xor 	a
 		out 	($FE),a
+
+		pop 	de
 		pop 	bc
 		pop 	af
-		ld 		hl,$1820 							; H = 24,L = 32, screen extent
+		ld 		hl,$1820 							; still 32 x 24
 		ret
-
-; *********************************************************************************
 ;
-;				Write a character E on the screen at HL, in colour D
+;		Print Character E, colour D, position HL
 ;
-; *********************************************************************************
-
 GFXCharacterHandler:
-		push 	af 									; save registers
+		push 	af
 		push 	bc
 		push 	de
 		push 	hl
+		push 	ix
 
-		ld 		b,e 								; character in B
-		ld 		a,h 								; check range.
-		cp 		3
-		jr 		nc,__ZXWCExit
-;
-;		work out attribute position
-;
-		push 	hl 									; save position.
-		ld 		a,h
-		add 	$58
-		ld 		h,a
-
-		ld 		a,d 								; get current colour
-		and 	7  									; mask 0..2
-		or 		$40  								; make bright
-		ld 		(hl),a 								; store it.
-		pop 	hl
-;
-;		calculate screen position => HL
-;
-		push 	de
-		ex 		de,hl
-		ld 		l,e 								; Y5 Y4 Y3 X4 X3 X2 X1 X0
-		ld 		a,d
-		and 	3
-		add 	a,a
-		add 	a,a
-		add 	a,a
-		or 		$40
-		ld 		h,a
-		pop 	de
-;
-;		char# 32-127 to font address => DE
-;
-		ld 		a,b 								; get character
-		call 	GFXGetFontGraphicDE
-;
-;		copy font data to screen position.
-;
+		ld 		b,e 								; save A temporarily
 		ld 		a,b
-		ld 		b,8 								; copy 8 characters
-		ld 		c,0 								; XOR value 0
-__ZXWCCopy:
-		ld 		a,(de)								; get font data
-		ld 		(hl),a 								; write back
-		inc 	h 									; bump pointers
-		inc 	de
-		djnz 	__ZXWCCopy 							; do B times.
-__ZXWCExit:
-		pop 	hl 									; restore and exit
+
+		ld 		a,h
+		cp 		3
+		jr 		nc,__L2Exit 						; check position in range
+		ld 		a,b
+
+		push 	af
+		xor 	a 									; convert colour in C to palette index
+		bit 	0,d 								; (assumes standard palette)
+		jr 		z,__L2Not1
+		or 		$03
+__L2Not1:
+		bit 	2,d
+		jr 		z,__L2Not2
+		or 		$1C
+__L2Not2:
+		bit 	1,d
+		jr 		z,__L2Not3
+		or 		$C0
+__L2Not3:
+		ld 		c,a 								; C is foreground
+		pop 	af 									; restore char
+
+		call 	GFXGetFontGraphicDE 				; font offset in DE
+		push 	de 									; transfer to IX
+		pop 	ix
+
+		;
+		;		figure out the correct bank.
+		;
+		push 	bc
+		ld  	a,h 								; this is the page number.
+		rrc 	a
+		rrc 	a
+		and 	$C0 								; in bits 6 & 7
+		or 		$03 								; shadow on, visible, enable write pagin.
+		ld 		bc,$123B 							; out to layer 2 port
+		out 	(c),a
+		pop 	bc
+		;
+		; 		now figure out position in bank
+		;
+		ex 		de,hl
+		ld 		l,e
+		ld 		h,0
+		add 	hl,hl
+		add 	hl,hl
+		add 	hl,hl
+		sla 	h
+		sla 	h
+		sla 	h
+
+		ld 		e,8 								; do 8 rows
+__L2Outer:
+		push 	hl 									; save start
+		ld 		d,8 								; do 8 columns
+		ld 		a,(ix+0) 							; get the bit pattern
+		inc 	ix
+		or 		a
+		jr 		z,__L2Blank
+__L2Loop:
+		ld 		(hl),0 								; background
+		add 	a,a 								; shift pattern left
+		jr 		nc,__L2NotSet
+		ld 		(hl),c 								; if MSB was set, overwrite with fgr
+__L2NotSet:
+		inc 	hl
+		dec 	d 									; do a row
+		jr 		nz,	__L2Loop
+		jr 		__L2Exit1
+__L2Blank:
+		xor 	a
+		ld 		(hl),a
+		inc 	hl
+		ld 		(hl),a
+		inc 	hl
+		ld 		(hl),a
+		inc 	hl
+		ld 		(hl),a
+		inc 	hl
+		ld 		(hl),a
+		inc 	hl
+		ld 		(hl),a
+		inc 	hl
+		ld 		(hl),a
+		inc 	hl
+		ld 		(hl),a
+__L2Exit1:
+		pop 	hl 									; restore, go 256 bytes down.
+		inc 	h
+		dec 	e 									; do 8 rows
+		jr 		nz,__L2Outer
+__L2Exit:
+		pop 	ix
+		pop 	hl
 		pop 	de
 		pop 	bc
 		pop 	af
 		ret
-
 ; *********************************************************************************
 ; *********************************************************************************
 ;
@@ -418,13 +484,17 @@ SystemInformation:
 Here:												; +0 	Here
 		dw 		FreeMemory
 HerePage: 											; +2	Here.Page
-		db 		$20,0
+		db 		FirstCodePage,0
 NextFreePage: 										; +4 	Next available code page (2 8k pages/page)
-		db 		$22,0,0,0
+		db 		FirstCodePage+2,0,0,0
 DisplayInfo: 										; +8 	Display information
 		dw 		DisplayInformation,0
 Parameter: 											; +12 	Third Parameter used in some functions.
 		dw 		0,0
+StartAddress: 										; +16 	Start Address
+		dw 		__KernelHalt
+StartAddressPage: 									; +20 	Start Page
+		db 		FirstCodePage,0
 
 ; ***************************************************************************************
 ;
